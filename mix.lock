@@ -1,5 +1,6 @@
 %{
   "hex": {:git, "https://github.com/hexpm/hex.git", "e9e02933bbbf21cd222f64b785db27af2c790ecc", [tag: "v2.1.1"]},
+  "hex_core": {:hex, :hex_core, "0.10.2", "1a80c487d0ebf57e6371721335f37689773f4df477e04bc2e962226f32d280a7", [:rebar3], [], "hexpm", "e4de8b979548637ae9e2e4d6363a1ca114488617cf7e11af3dd98aa333d596d2"},
   "jason": {:hex, :jason, "1.4.1", "af1504e35f629ddcdd6addb3513c3853991f694921b1b9368b0bd32beb9f1b63", [:mix], [{:decimal, "~> 1.0 or ~> 2.0", [hex: :decimal, repo: "hexpm", optional: true]}], "hexpm", "fbb01ecdfd565b56261302f7e1fcc27c4fb8f32d56eab74db621fc154604a7a1"},
   "stream_gzip": {:hex, :stream_gzip, "0.4.2", "838044dd31dcb15d0a29e1c80b82835c0e7fd5ab81baac328c84e0266c35b9d0", [:mix], [], "hexpm", "3657a5d68c6700b24160b793d74e039074b799abd30ba0727a0c2084a0d3e100"},
 }
