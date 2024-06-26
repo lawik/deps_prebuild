@@ -1,0 +1,1 @@
+:hex_api_package.search(:hex_core.default_config(), "", page: 1)
