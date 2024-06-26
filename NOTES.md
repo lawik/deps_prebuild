@@ -1,0 +1,1 @@
+- Maintain online listing of known-weird packages and their version ranges so the tool can update that listing and know to build bad-package 1.2.3 from scratch instead ever relying on the built one
