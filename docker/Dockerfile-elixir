@@ -8,7 +8,7 @@ ARG ABI="gnu"
 ARG GITHUB_API_TOKEN
 
 #FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-alpine-3.20.1 AS build
-FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-ubuntu-jammy-20240530
+FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-ubuntu-jammy
 
 ARG ELIXIR_VERSION
 ARG OTP_VERSION
