@@ -27,7 +27,7 @@ defmodule DepsPrebuildTest do
       |> String.trim()
       |> Path.join([".mix/**"])
       |> Path.wildcard()
-      |> Enum.find(& String.contains?(&1, "rebar3"))
+      |> Enum.find(&String.contains?(&1, "rebar3"))
       |> dbg()
 
     stuff

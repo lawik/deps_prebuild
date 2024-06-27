@@ -81,8 +81,9 @@ defmodule DepsPrebuild do
       |> Build.set_mix_env(:prod)
 
     results
-    |> Enum.take(5)
-    |> Enum.map(fn package ->
+    # |> Enum.take(5)
+    |> Enum.with_index()
+    |> Enum.map(fn {package, index} ->
       %{"name" => name, "latest_stable_version" => version} = package
 
       build =
@@ -100,11 +101,17 @@ defmodule DepsPrebuild do
       with {:ok, build} <- download_to(build) |> dbg(),
            {:ok, build} <- unpack_and_verify(build) |> dbg(),
            {:ok, build} <- check_package_type(build) |> dbg(),
-           {:ok, build} <- build_package(build) do
+           {:ok, build} <- build_package(build),
+           {:ok, build} <- extract_build(build),
+           {:ok, build} <- package_build(build) do
         IO.puts("Finished building #{name} @ #{version}")
         IO.puts("Build at: #{build.built_dir}")
+        IO.puts("Done ##{index + 1}")
         :ok
       else
+        {:skip, reason} ->
+          IO.puts("Skipping package #{name} @ #{version}, unusual setup: #{reason}")
+
         e ->
           dbg(e)
           raise "failed"
@@ -188,8 +195,56 @@ defmodule DepsPrebuild do
   end
 
   def build_package(%Build{package_type: :erlang} = b) do
-    Logger.warning("Skipping erlang builds for the moment...")
-    {:ok, b}
+    id = "d#{System.unique_integer([:positive])}"
+    built_dir = Path.join(b.unpacked_dir, "_build")
+    b = Build.set_built_dir(b, built_dir)
+
+    with :ok <- docker_build(b, "docker/Dockerfile-erlang", id),
+         :ok <- docker_create(id),
+         :ok <- docker_cp(id, built_dir),
+         :ok <- docker_rm(id) do
+      {:ok, b}
+    end
+  end
+
+  def extract_build(%Build{built_dir: base} = b) do
+    entries =
+      base
+      |> Path.join("/**/#{b.package_name}")
+      |> Path.wildcard()
+      |> dbg()
+
+    case entries do
+      [artifact_dir] ->
+        b = Build.set_artifact_dir(b, artifact_dir)
+        # Remove any consolidated protocols, the rest should be okay
+        File.rm_rf(Path.join(artifact_dir, "consolidated"))
+        {:ok, b}
+
+      [] ->
+        Logger.error("Found no artifact folders.")
+        {:skip, :artifacts_not_found}
+
+      artifacts ->
+        Logger.warning(
+          "Skipping unusual package. Found multiple artifact folders: #{inspect(artifacts)}"
+        )
+
+        {:skip, :multiple_artifacts}
+    end
+  end
+
+  def package_build(%Build{} = b) do
+    built_package_path = Path.join(b.unpacked_dir, Build.tag(b))
+
+    case pack(b.artifact_dir, built_package_path) do
+      :ok ->
+        b = Build.set_built_package_path(b, built_package_path)
+        {:ok, b}
+
+      {:error, reason} ->
+        {:error, {:package_build_failed, reason}}
+    end
   end
 
   def docker_build(%Build{} = b, dockerfile, id) do
@@ -200,6 +255,7 @@ defmodule DepsPrebuild do
         dockerfile,
         "--tag",
         "#{id}-image",
+        "--progress=plain",
         "--build-arg",
         "GITHUB_API_TOKEN=#{System.get_env("GITHUB_API_TOKEN")}"
       ] ++
@@ -221,7 +277,7 @@ defmodule DepsPrebuild do
   end
 
   def docker_create(id) do
-    case System.cmd("docker", ["create", "#{id}-image", "--name", "#{id}-container"]) do
+    case System.cmd("docker", ["create", "--name", "#{id}-container", "#{id}-image"]) do
       {_, 0} ->
         :ok
 
@@ -232,7 +288,7 @@ defmodule DepsPrebuild do
   end
 
   def docker_cp(id, built_dir) do
-    case System.cmd("docker", ["cp", "#{id}-container:/_build", built_dir]) do
+    case System.cmd("docker", ["cp", "#{id}-container:/build/_build", built_dir]) do
       {_, 0} ->
         :ok
 

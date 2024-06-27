@@ -12,7 +12,9 @@ defmodule DepsPrebuild.Build do
             hex_package_path: nil,
             unpacked_dir: nil,
             contents_dir: nil,
-            built_dir: nil
+            built_dir: nil,
+            artifact_dir: nil,
+            built_package_path: nil
 
   alias __MODULE__, as: B
 
@@ -74,6 +76,14 @@ defmodule DepsPrebuild.Build do
 
   def set_built_dir(%B{} = b, built_dir) do
     %B{b | built_dir: built_dir}
+  end
+
+  def set_artifact_dir(%B{} = b, artifact_dir) do
+    %B{b | artifact_dir: artifact_dir}
+  end
+
+  def set_built_package_path(%B{} = b, built_package_path) do
+    %B{b | built_package_path: built_package_path}
   end
 
   def docker_build_args(%B{} = b) do
