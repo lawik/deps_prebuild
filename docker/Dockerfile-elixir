@@ -1,0 +1,42 @@
+ARG ELIXIR_VERSION
+ARG OTP_VERSION
+ARG ARCH
+ARG GCC_VERSION
+ARG LIBC
+ARG MIX_ENV
+ARG ABI="gnu"
+ARG GITHUB_API_TOKEN
+
+FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-alpine-3.20.1 AS build
+ARG ELIXIR_VERSION
+ARG OTP_VERSION
+ARG ARCH
+ARG GCC_VERSION
+ARG LIBC
+ARG MIX_ENV
+ARG ABI
+ARG GITHUB_API_TOKEN
+
+# install build dependencies
+RUN apk add --no-cache bash build-base git curl jq mise xz
+
+# Nerves toolchains are nicely set up for cross compilation
+# RUN git config --global advice.detachedHead false && \
+#     git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.14.0 && \
+#     export ASDF_DIR=$HOME/.asdf && \
+#     . "$ASDF_DIR/asdf.sh" && \
+RUN BLA=11 mise plugin add nerves-toolchain https://github.com/nerves-project/asdf-plugin-nerves-toolchain.git
+
+RUN export GITHUB_API_TOKEN=${GITHUB_API_TOKEN} && mise install nerves-toolchain@${GCC_VERSION}-${ARCH}-nerves-linux-${ABI}
+
+# TODO: actually use the toolchain y'all
+
+# install hex + rebar
+RUN mix local.hex --force && \
+    mix local.rebar --force
+
+# set build ENV
+ENV MIX_ENV=${MIX_ENV}
+
+# install mix dependencies
+RUN mix do deps.get, compile

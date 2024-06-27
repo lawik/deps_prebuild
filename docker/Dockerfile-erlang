@@ -1,24 +1,31 @@
 ARG ELIXIR_VERSION
 ARG OTP_VERSION
-ARG OS_VERSION="alpine"
+ARG ARCH
+ARG GCC_VERSION
+ARG LIBC
+ARG MIX_ENV
+ARG OS="alpine"
+
 FROM elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-${OS} AS build
 
 # install build dependencies
-RUN apk add --no-cache build-base
+RUN apk add --no-cache build-base git curl
 
-# prepare build dir
-WORKDIR /app
+RUN git clone https://github.com/asdf-vm/asdf.git /.asdf --branch v0.14.0 && \
+    source "/.asdf/asdf.sh"
+
+# Nerves toolchains are nicely set up for cross compilation
+RUN asdf plugin add nerves-toolchain https://github.com/nerves-project/asdf-plugin-nerves-toolchain.git && \
+    asdf install nerves-toolchain ${GCC_VERSION}-${ARCH}-nerves-linux-${LIBC}
 
 # install hex + rebar
 RUN mix local.hex --force && \
     mix local.rebar --force
 
 # set build ENV
-ENV MIX_ENV=prod
+ENV MIX_ENV=${MIX_ENV}
 
 # install mix dependencies
-COPY mix.exs mix.lock ./
-COPY config config
 RUN mix do deps.get, deps.compile
 
 # build assets

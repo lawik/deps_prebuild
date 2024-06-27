@@ -24,7 +24,9 @@ defmodule DepsPrebuild.MixProject do
       {:jason, "~> 1.4"},
       {:stream_gzip, "~> 0.4.2"},
       # {:hex, github: "hexpm/hex", tag: "v2.1.1"},
-      {:hex_core, "~> 0.10.2"}
+      {:hex_core, "~> 0.10.2"},
+      {:req, "~> 0.5.1"}
+
       # {:libzstd, "~> 1.3.7", github: "facebook/zstd", app: false},
       # {:ex_zstd, "~> 0.1.0"}
     ]
