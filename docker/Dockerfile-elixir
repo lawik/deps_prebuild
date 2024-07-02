@@ -7,8 +7,8 @@ ARG MIX_ENV
 ARG ABI="gnu"
 ARG GITHUB_API_TOKEN
 
-#FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-alpine-3.20.1 AS build
-FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-ubuntu-jammy
+FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-alpine-3.20.1 AS build
+#FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-ubuntu-jammy
 
 ARG ELIXIR_VERSION
 ARG OTP_VERSION
@@ -20,8 +20,8 @@ ARG ABI
 ARG GITHUB_API_TOKEN
 
 # install build dependencies
-#RUN apk add --no-cache bash build-base git curl jq mise xz
-RUN apt-get update && apt-get install -y bash build-essential git curl jq xz-utils
+RUN apk add --no-cache bash build-base git curl jq mise xz
+#RUN apt-get update && apt-get install -y bash build-essential git curl jq xz-utils
 
 
 
@@ -30,43 +30,44 @@ RUN apt-get update && apt-get install -y bash build-essential git curl jq xz-uti
 #    git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.14.0 && \
 #     export ASDF_DIR=$HOME/.asdf && \
 #     . "$ASDF_DIR/asdf.sh" && \
-RUN git clone https://github.com/lawik/asdf-plugin-nerves-toolchain.git /apnt
-WORKDIR /apnt
-RUN ./bin/list-all
-RUN mkdir /apnt/download
-RUN export ASDF_INSTALL_TYPE="version" && \
-    export ASDF_INSTALL_VERSION="v13.2.0-x86_64-nerves-linux-gnu" && \
-    export ASDF_INSTALL_PATH="/apnt/toolchain/" && \
-    export ASDF_DOWNLOAD_PATH="/apnt/download" && \
-    ./bin/download
+# RUN git clone https://github.com/lawik/asdf-plugin-nerves-toolchain.git /apnt
+# WORKDIR /apnt
+# RUN ./bin/list-all
+# RUN mkdir /apnt/download
+# RUN export ASDF_INSTALL_TYPE="version" && \
+#     export ASDF_INSTALL_VERSION="v13.2.0-x86_64-nerves-linux-gnu" && \
+#     export ASDF_INSTALL_PATH="/apnt/toolchain/" && \
+#     export ASDF_DOWNLOAD_PATH="/apnt/download" && \
+#     ./bin/download
 
-RUN echo $(ls download)
-ENV TC_BASE="/apnt/download" \
-    PATH="$PATH:${TC_BASE}/bin" \
-    GCC_PREFIX="$ARCH-nerves-linux-$ABI-" \
-    CC="${GCC_PREFIX}gcc" \
-	CXX="${GCC_PREFIX}g++" \
-	LD="${GCC_PREFIX}ld" \
-	AR="${GCC_PREFIX}ar" \
-	AS="${GCC_PREFIX}as" \
-	NM="${GCC_PREFIX}nm" \
-	STRINGS="${GCC_PREFIX}strings" \
-	RANLIB="${GCC_PREFIX}ranlib" \
-	OBJCOPY="${GCC_PREFIX}objcopy" \
-	OBJDUMP="${GCC_PREFIX}objdump" \
-	READELF="${GCC_PREFIX}readelf" \
-	SIZE="${GCC_PREFIX}size" \
-	STRIP="${GCC_PREFIX}strip" \
-    LDFLAGS="-L${TC_BASE}/lib" \
-    CFLAGS="-I${TC_BASE}/include" \
-    CPPFLAGS="-I${TC_BASE}/include" \
-    CROSSCOMPILE="{$GCC_PREFIX}"
+# RUN echo $(ls download)
+# ENV TC_BASE="/apnt/download" \
+#     PATH="$PATH:${TC_BASE}/bin" \
+#     GCC_PREFIX="$ARCH-nerves-linux-$ABI-" \
+#     CC="${GCC_PREFIX}gcc" \
+#     CXX="${GCC_PREFIX}g++" \
+#     LD="${GCC_PREFIX}ld" \
+#     AR="${GCC_PREFIX}ar" \
+#     AS="${GCC_PREFIX}as" \
+#     NM="${GCC_PREFIX}nm" \
+#     STRINGS="${GCC_PREFIX}strings" \
+#     RANLIB="${GCC_PREFIX}ranlib" \
+#     OBJCOPY="${GCC_PREFIX}objcopy" \
+#     OBJDUMP="${GCC_PREFIX}objdump" \
+#     READELF="${GCC_PREFIX}readelf" \
+#     SIZE="${GCC_PREFIX}size" \
+#     STRIP="${GCC_PREFIX}strip" \
+#     LDFLAGS="-L${TC_BASE}/lib" \
+#     CFLAGS="-I${TC_BASE}/include" \
+#     CPPFLAGS="-I${TC_BASE}/include" \
+#     CROSSCOMPILE="{$GCC_PREFIX}"
 
 
-# RUN BLA=33 && \
-#     export GITHUB_API_TOKEN=${GITHUB_API_TOKEN} && \
-#     mise plugin add nerves-toolchain https://github.com/nerves-project/asdf-plugin-nerves-toolchain.git && \
-#     mise install nerves-toolchain@${GCC_VERSION}-${ARCH}-nerves-linux-${ABI}
+RUN BLA=33 && \
+    export GITHUB_API_TOKEN=${GITHUB_API_TOKEN} && \
+    mise plugin add nerves-toolchain https://github.com/nerves-project/asdf-plugin-nerves-toolchain.git && \
+    mise plugin update nerves-toolchain#strip-newlines-from-json && \
+    mise install nerves-toolchain@${GCC_VERSION}-${ARCH}-nerves-linux-${ABI}
 
 # TODO: actually use the toolchain y'all
 ENV BLARG=3
