@@ -118,7 +118,7 @@ defmodule DepsPrebuild do
     |> Build.set_mix_env(mix_env)
   end
 
-  def reset_base_dir(%Build{base_dir: base_dir} = b, base_dir) do
+  def reset_base_dir(%Build{} = b, base_dir) do
     b = Build.set_base_dir(b, base_dir)
     File.rm_rf(base_dir)
     File.mkdir_p!(base_dir)
@@ -140,7 +140,7 @@ defmodule DepsPrebuild do
          {:ok, build} <- package_build(build) do
       IO.puts("Finished building #{name} @ #{version}")
       IO.puts("Build at: #{build.built_dir}")
-      :ok
+      {:ok, build}
     else
       {:skip, reason} ->
         IO.puts("Skipping package #{name} @ #{version}, unusual setup: #{reason}")
@@ -384,6 +384,7 @@ defmodule DepsPrebuild do
       base
       |> Path.join("/**/#{b.package_name}")
       |> Path.wildcard()
+      |> dbg()
 
     case entries do
       [artifact_dir] ->

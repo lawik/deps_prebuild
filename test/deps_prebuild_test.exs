@@ -3,7 +3,7 @@ defmodule DepsPrebuildTest do
   # doctest DepsPrebuild
 
   @tag :tmp_dir
-  test "create new project, compare prebuilds with regular", %{tmp_dir: tmp_dir} do
+  test "create new project and compare prebuilds with regular", %{tmp_dir: tmp_dir} do
     p1 = Path.join(tmp_dir, "p1")
     p2 = Path.join(tmp_dir, "p2")
     File.cp_r!("test/fixtures/sample_project", p1)
@@ -29,15 +29,22 @@ defmodule DepsPrebuildTest do
     p2
     |> Path.join("mix.lock")
     |> Code.eval_file()
+    |> elem(0)
     |> Enum.map(fn {package_name, dep} ->
       version = elem(dep, 2)
 
-      build =
+      {:ok, build} =
         build
-        |> DepsPrebuild.with_package(package_name, version)
+        |> DepsPrebuild.with_package(to_string(package_name), version)
         |> DepsPrebuild.download_and_build()
 
-      built_dep_path = Path.join(p2, "_build/#{build.mix_env}/lib/#{package_name}")
+      artifact_subpath = Path.relative_to(build.artifact_dir, build.contents_dir)
+      built_dep_path = Path.join(p2, artifact_subpath)
+
+      built_dep_path
+      |> Path.dirname()
+      |> File.mkdir_p!()
+
       File.cp_r!(build.built_dir, built_dep_path)
     end)
 
