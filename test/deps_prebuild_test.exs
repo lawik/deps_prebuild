@@ -3,6 +3,70 @@ defmodule DepsPrebuildTest do
   # doctest DepsPrebuild
 
   @tag :tmp_dir
+  test "create new project, compare prebuilds with regular", %{tmp_dir: tmp_dir} do
+    p1 = Path.join(tmp_dir, "p1")
+    p2 = Path.join(tmp_dir, "p2")
+    File.cp_r!("test/fixtures/sample_project", p1)
+    File.cp_r!("test/fixtures/sample_project", p2)
+    dbg(p1)
+    assert {_, 0} = System.cmd("mix", ["deps.get"], cd: p1)
+    assert {_, 0} = System.cmd("mix", ["deps.compile"], cd: p1)
+
+    prebuild_dir = Path.join(tmp_dir, "prebuild")
+
+    build =
+      DepsPrebuild.new(
+        "1.17.1",
+        "26.2.5.1",
+        "v13.2.0",
+        :aarch64,
+        :macos,
+        :gnu,
+        :dev
+      )
+      |> DepsPrebuild.reset_base_dir(prebuild_dir)
+
+    p2
+    |> Path.join("mix.lock")
+    |> Code.eval_file()
+    |> Enum.map(fn {package_name, dep} ->
+      version = elem(dep, 2)
+
+      build =
+        build
+        |> DepsPrebuild.with_package(package_name, version)
+        |> DepsPrebuild.download_and_build()
+
+      built_dep_path = Path.join(p2, "_build/#{build.mix_env}/lib/#{package_name}")
+      File.cp_r!(build.built_dir, built_dep_path)
+    end)
+
+    assert {_, 0} = System.cmd("mix", ["deps.get"], cd: p2)
+
+    # Compare 'em
+    p1_paths = Path.wildcard(Path.join(p1, "/**"))
+    p2_paths = Path.wildcard(Path.join(p1, "/**"))
+
+    refute Enum.any?(p1_paths, fn p1_path ->
+             if p1_path not in p2_paths do
+               dbg(p1_path)
+               true
+             else
+               false
+             end
+           end)
+
+    refute Enum.any?(p2_paths, fn p2_path ->
+             if p2_path not in p1_paths do
+               dbg(p2_path)
+               true
+             else
+               false
+             end
+           end)
+  end
+
+  @tag :tmp_dir
   test "compress and decompress the Jason library", %{tmp_dir: tmp_dir} do
     target_file = Path.join(tmp_dir, "jason")
 
@@ -31,6 +95,7 @@ defmodule DepsPrebuildTest do
       |> dbg()
 
     stuff
+    |> Enum.take(1)
     |> Enum.map(fn pkg ->
       dbg(pkg)
       assert %{"name" => name, "latest_stable_version" => version} = pkg

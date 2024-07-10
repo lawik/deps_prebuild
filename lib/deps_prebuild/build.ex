@@ -9,6 +9,7 @@ defmodule DepsPrebuild.Build do
             gcc_version: nil,
             libc: nil,
             mix_env: nil,
+            base_dir: nil,
             hex_package_path: nil,
             unpacked_dir: nil,
             contents_dir: nil,
@@ -60,6 +61,10 @@ defmodule DepsPrebuild.Build do
 
   def set_mix_env(%B{} = b, mix_env) do
     %B{b | mix_env: mix_env}
+  end
+
+  def set_base_dir(%B{} = b, base_dir) do
+    %B{b | base_dir: base_dir}
   end
 
   def set_hex_package_path(%B{} = b, hex_package_path) do
