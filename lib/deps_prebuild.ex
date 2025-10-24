@@ -23,6 +23,36 @@ defmodule DepsPrebuild do
   ]
   @mix_envs [:prod, :dev, :test]
 
+  @dh_namespace "hexpm"
+  @dh_repo "elixir"
+  @dh_page_size 100
+
+  def docker_hub_find_tag(prefix) do
+    "https://hub.docker.com/v2/namespaces/#{@dh_namespace}/repositories/#{@dh_repo}/tags?page=1&page_size=100"
+    |> docker_hub_find()
+  end
+
+  defp docker_hub_find(url) do
+    with {:ok, %{body: %{"results" => results}} = meta} <- Req.get(url) do
+      find =
+        Enum.find(results, fn %{"name" => name} ->
+          String.starts_with?(name, prefix)
+        end)
+
+      case find do
+        %{"name" => name} ->
+          {:ok, name}
+
+        nil ->
+          if meta["next"] do
+            docker_hub_find(meta["next"])
+          else
+            {:error, :no_match}
+          end
+      end
+    end
+  end
+
   def combinations do
     os_arch_combos =
       @arch_and_os |> Enum.map(fn {_os, arches} -> Enum.count(arches) end) |> Enum.sum()

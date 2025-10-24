@@ -86,6 +86,10 @@ defmodule DepsPrebuild.Build do
     %B{b | built_package_path: built_package_path}
   end
 
+  def docker_hub_tag_prefix(%B{} = b) do
+    "#{b.elixir_version}-erlang-#{b.otp_version}-ubuntu-jammy"
+  end
+
   def docker_build_args(%B{} = b) do
     [
       "--build-arg",
