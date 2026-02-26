@@ -130,10 +130,12 @@ defmodule DepsPrebuild do
       with {:ok, build} <- download_to(build),
            {:ok, build} <- unpack_and_verify(build),
            {:ok, build} <- check_package_type(build),
+           build = detect_native(build),
            {:ok, build} <- build_package(build),
            {:ok, build} <- extract_build(build),
            {:ok, build} <- package_build(build) do
-        IO.puts("Finished building #{name} @ #{version}")
+        native_label = if build.native, do: " (native: #{inspect(build.native_reasons)})", else: " (pure)"
+        IO.puts("Finished building #{name} @ #{version}#{native_label}")
         IO.puts("Build at: #{build.built_dir}")
         IO.puts("Done ##{index + 1}")
         :ok
@@ -142,8 +144,8 @@ defmodule DepsPrebuild do
           IO.puts("Skipping package #{name} @ #{version}, unusual setup: #{reason}")
 
         e ->
-          dbg(e)
-          raise "failed"
+          Logger.error("Build failed for #{name} @ #{version}: #{inspect(e)}")
+          {:error, e}
       end
     end)
   end
@@ -207,9 +209,16 @@ defmodule DepsPrebuild do
     end
   end
 
-  # docker create --name dummy IMAGE_NAME
-  # docker cp dummy:/path/to/file /dest/to/file
-  # docker rm -f dummy
+  def detect_native(%Build{} = b) do
+    case DepsPrebuild.NifDetector.detect(b.contents_dir) do
+      :pure ->
+        %Build{b | native: false, native_reasons: []}
+
+      {:native, reasons} ->
+        %Build{b | native: true, native_reasons: reasons}
+    end
+  end
+
   def build_package(%Build{package_type: :elixir} = b) do
     id = "d#{System.unique_integer([:positive])}"
     built_dir = Path.join(b.unpacked_dir, "_build")

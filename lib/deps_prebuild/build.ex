@@ -2,6 +2,8 @@ defmodule DepsPrebuild.Build do
   defstruct package_name: nil,
             package_version: nil,
             package_type: nil,
+            native: nil,
+            native_reasons: [],
             elixir_version: nil,
             otp_version: nil,
             arch: nil,
