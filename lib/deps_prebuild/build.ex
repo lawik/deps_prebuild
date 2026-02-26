@@ -1,4 +1,6 @@
 defmodule DepsPrebuild.Build do
+  @default_base_image_os "debian-bookworm-20260223"
+
   defstruct package_name: nil,
             package_version: nil,
             package_type: nil,
@@ -11,6 +13,7 @@ defmodule DepsPrebuild.Build do
             gcc_version: nil,
             libc: nil,
             mix_env: nil,
+            base_image_os: @default_base_image_os,
             hex_package_path: nil,
             unpacked_dir: nil,
             contents_dir: nil,
@@ -106,7 +109,7 @@ defmodule DepsPrebuild.Build do
   end
 
   def docker_hub_tag_prefix(%B{} = b) do
-    "#{b.elixir_version}-erlang-#{b.otp_version}-ubuntu-jammy"
+    "#{b.elixir_version}-erlang-#{b.otp_version}-#{b.base_image_os}"
   end
 
   def docker_build_args(%B{native: false} = b) do
@@ -115,6 +118,8 @@ defmodule DepsPrebuild.Build do
       "ELIXIR_VERSION=#{b.elixir_version}",
       "--build-arg",
       "OTP_VERSION=#{b.otp_version}",
+      "--build-arg",
+      "BASE_IMAGE_OS=#{b.base_image_os}",
       "--build-arg",
       "MIX_ENV=#{b.mix_env}"
     ]
@@ -126,6 +131,8 @@ defmodule DepsPrebuild.Build do
       "ELIXIR_VERSION=#{b.elixir_version}",
       "--build-arg",
       "OTP_VERSION=#{b.otp_version}",
+      "--build-arg",
+      "BASE_IMAGE_OS=#{b.base_image_os}",
       "--build-arg",
       "ARCH=#{b.arch}",
       "--build-arg",

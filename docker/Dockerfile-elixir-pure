@@ -1,8 +1,9 @@
 ARG ELIXIR_VERSION
 ARG OTP_VERSION
+ARG BASE_IMAGE_OS="debian-bookworm-20260223"
 ARG MIX_ENV
 
-FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-ubuntu-jammy
+FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-${BASE_IMAGE_OS}
 
 ARG MIX_ENV
 

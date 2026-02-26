@@ -61,13 +61,17 @@ defmodule DepsPrebuild do
   end
 
   def pack(dir, archive_name) do
-    dir
-    |> Path.join("**")
-    |> Path.wildcard()
-    |> Enum.map(&to_charlist/1)
-    |> then(fn filenames ->
-      :erl_tar.create("#{archive_name}.tar.gz", filenames, [:compressed])
-    end)
+    files =
+      dir
+      |> Path.join("**")
+      |> Path.wildcard()
+      |> Enum.reject(&File.dir?/1)
+      |> Enum.map(fn abs_path ->
+        rel_path = Path.relative_to(abs_path, dir)
+        {to_charlist(rel_path), to_charlist(abs_path)}
+      end)
+
+    :erl_tar.create("#{archive_name}.tar.gz", files, [:compressed])
   end
 
   def unpack(archive_path, new_dir) do
@@ -237,7 +241,8 @@ defmodule DepsPrebuild do
     with :ok <- docker_build(b, dockerfile, id),
          :ok <- docker_create(id),
          :ok <- docker_cp(id, built_dir),
-         :ok <- docker_rm(id) do
+         :ok <- docker_rm(id),
+         :ok <- docker_rmi(id) do
       {:ok, b}
     end
   end
@@ -282,6 +287,12 @@ defmodule DepsPrebuild do
   end
 
   def docker_build(%Build{} = b, dockerfile, id) do
+    token_args =
+      case System.get_env("GITHUB_API_TOKEN") do
+        nil -> []
+        token -> ["--build-arg", "GITHUB_API_TOKEN=#{token}"]
+      end
+
     args =
       [
         "build",
@@ -289,16 +300,21 @@ defmodule DepsPrebuild do
         dockerfile,
         "--tag",
         "#{id}-image",
-        "--progress=plain",
-        "--build-arg",
-        "GITHUB_API_TOKEN=#{System.get_env("GITHUB_API_TOKEN")}"
+        "--progress=plain"
       ] ++
+        token_args ++
         Build.docker_build_args(b) ++
         [
           b.contents_dir
         ]
 
-    IO.puts("docker #{Enum.join(args, " ")}")
+    # Log command without secrets
+    safe_args = Enum.map(args, fn
+      "GITHUB_API_TOKEN=" <> _ -> "GITHUB_API_TOKEN=***"
+      arg -> arg
+    end)
+
+    IO.puts("docker #{Enum.join(safe_args, " ")}")
 
     case System.cmd("docker", args) do
       {_, 0} ->
@@ -340,6 +356,18 @@ defmodule DepsPrebuild do
       {out, status} ->
         Logger.error("Failed during docker rm with status #{status}: #{out}")
         {:error, {:docker_rm_failed, status}}
+    end
+  end
+
+  def docker_rmi(id) do
+    case System.cmd("docker", ["rmi", "#{id}-image"]) do
+      {_, 0} ->
+        :ok
+
+      {out, _status} ->
+        Logger.warning("Failed to remove docker image #{id}-image: #{out}")
+        # Non-fatal - image cleanup is best-effort
+        :ok
     end
   end
 
