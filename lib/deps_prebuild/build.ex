@@ -18,8 +18,25 @@ defmodule DepsPrebuild.Build do
 
   alias __MODULE__, as: B
 
-  def new() do
+  def new do
     %B{}
+  end
+
+  def new(attrs) when is_list(attrs) do
+    struct!(B, attrs)
+  end
+
+  def for_current_platform(gcc_version \\ "v13.2.0") do
+    alias DepsPrebuild.Platform
+
+    %B{
+      elixir_version: System.version(),
+      otp_version: Platform.otp_version(),
+      gcc_version: gcc_version,
+      arch: Platform.arch(),
+      os: Platform.os(),
+      libc: Platform.libc() || :gnu
+    }
   end
 
   def set_package_name(%B{} = b, package_name) do
