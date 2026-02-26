@@ -109,6 +109,17 @@ defmodule DepsPrebuild.Build do
     "#{b.elixir_version}-erlang-#{b.otp_version}-ubuntu-jammy"
   end
 
+  def docker_build_args(%B{native: false} = b) do
+    [
+      "--build-arg",
+      "ELIXIR_VERSION=#{b.elixir_version}",
+      "--build-arg",
+      "OTP_VERSION=#{b.otp_version}",
+      "--build-arg",
+      "MIX_ENV=#{b.mix_env}"
+    ]
+  end
+
   def docker_build_args(%B{} = b) do
     [
       "--build-arg",

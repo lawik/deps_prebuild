@@ -220,24 +220,21 @@ defmodule DepsPrebuild do
   end
 
   def build_package(%Build{package_type: :elixir} = b) do
-    id = "d#{System.unique_integer([:positive])}"
-    built_dir = Path.join(b.unpacked_dir, "_build")
-    b = Build.set_built_dir(b, built_dir)
-
-    with :ok <- docker_build(b, "docker/Dockerfile-elixir", id),
-         :ok <- docker_create(id),
-         :ok <- docker_cp(id, built_dir),
-         :ok <- docker_rm(id) do
-      {:ok, b}
-    end
+    dockerfile = if b.native, do: "docker/Dockerfile-elixir", else: "docker/Dockerfile-elixir-pure"
+    do_docker_build(b, dockerfile)
   end
 
   def build_package(%Build{package_type: :erlang} = b) do
+    dockerfile = if b.native, do: "docker/Dockerfile-erlang", else: "docker/Dockerfile-erlang-pure"
+    do_docker_build(b, dockerfile)
+  end
+
+  defp do_docker_build(b, dockerfile) do
     id = "d#{System.unique_integer([:positive])}"
     built_dir = Path.join(b.unpacked_dir, "_build")
     b = Build.set_built_dir(b, built_dir)
 
-    with :ok <- docker_build(b, "docker/Dockerfile-erlang", id),
+    with :ok <- docker_build(b, dockerfile, id),
          :ok <- docker_create(id),
          :ok <- docker_cp(id, built_dir),
          :ok <- docker_rm(id) do

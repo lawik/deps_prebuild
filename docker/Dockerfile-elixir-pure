@@ -1,0 +1,21 @@
+ARG ELIXIR_VERSION
+ARG OTP_VERSION
+ARG MIX_ENV
+
+FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-ubuntu-jammy
+
+ARG MIX_ENV
+
+# Pure BEAM packages don't need cross-compilation toolchains.
+# The compiled .beam files are portable across all architectures.
+RUN apt-get update && apt-get install -y git
+
+COPY . /build
+WORKDIR /build
+
+RUN mix local.hex --force && \
+    mix local.rebar --force
+
+ENV MIX_ENV=${MIX_ENV}
+
+RUN mix do deps.get, compile
