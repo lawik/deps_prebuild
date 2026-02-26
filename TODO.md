@@ -47,18 +47,35 @@
 - [x] Verified: `jason 1.4.1` builds end-to-end as pure BEAM package
 - [x] Produces clean `.tar.gz` with 29 relative-path `.beam` files
 
+### Top 50 Hex Packages Build Run
+- [x] 49/50 packages build successfully (see BUILD_REPORT.md)
+- [x] Fix false positive NIF detection:
+  - Makefile alone is NOT a NIF indicator (erlang.mk uses Makefiles for .erl compilation)
+  - Port.open/open_port is NOT a compilation indicator (runtime behavior only)
+  - Affected: ranch, cowlib, cowboy, ssl_verify_fun, ecto_sql (all now pure)
+- [x] 1 legitimate failure: `file_system` (has c_src/ with inotify wrapper)
+  - Fails because the native Dockerfile's Nerves toolchain download is broken
+  - The asdf plugin's download script returns an empty URL
+- [x] All 49 successful packages classified as pure (correct for top-50)
+
 ---
 
 ## Up Next
 
-### 1. Cross-Compilation Verification (native packages)
+### 1. Cross-Compilation / Native Package Builds
 
-The pure build path works. The cross-compilation path still needs testing.
+The pure build path works (49/50). The native path fails at toolchain download.
 
+- [ ] Fix the Nerves toolchain download - the asdf plugin's `./bin/download`
+  script finds the release but gets an empty URL. Likely a GitHub API or
+  jq parsing issue in the plugin. May need to fork/fix the plugin or
+  download toolchains directly.
+- [ ] Alternative: for x86_64 native builds, skip the Nerves toolchain
+  entirely and use the host system's gcc (already installed via build-essential)
 - [ ] Verify the `/etc/profile.d/toolchain.sh` approach works in Docker RUN
   (non-login shells don't source profile.d - may need explicit `source` or
   just set env vars directly with Docker ENV using separate RUN blocks)
-- [ ] Test building a native package (e.g. one with NIFs) on x86_64
+- [ ] Test building `file_system` as the first native package target
 - [ ] Test cross-compiling for aarch64 from x86_64
 
 ### 2. Remaining Compiler Warnings
