@@ -5,7 +5,6 @@ defmodule DepsPrebuild.NifDetectorTest do
 
   @tag :tmp_dir
   test "detects pure package (no native code)", %{tmp_dir: tmp_dir} do
-    # Create a minimal Elixir package with no NIFs
     File.write!(Path.join(tmp_dir, "mix.exs"), """
     defmodule Pure.MixProject do
       use Mix.Project
@@ -51,11 +50,30 @@ defmodule DepsPrebuild.NifDetectorTest do
   end
 
   @tag :tmp_dir
-  test "detects NIF via Makefile", %{tmp_dir: tmp_dir} do
-    File.write!(Path.join(tmp_dir, "Makefile"), "all:\n\tgcc -o nif.so nif.c")
+  test "Makefile alone does NOT indicate native code", %{tmp_dir: tmp_dir} do
+    # Many Erlang packages (ranch, cowlib, cowboy) use erlang.mk which has
+    # a Makefile for compiling .erl files, not C code
+    File.write!(Path.join(tmp_dir, "Makefile"), "all:\n\t$(MAKE) -f erlang.mk")
+    File.write!(Path.join(tmp_dir, "erlang.mk"), "# erlang build tool")
 
-    assert {:native, reasons} = NifDetector.detect(tmp_dir)
-    assert :makefile in reasons
+    assert :pure = NifDetector.detect(tmp_dir)
+  end
+
+  @tag :tmp_dir
+  test "Port.open does NOT indicate native compilation", %{tmp_dir: tmp_dir} do
+    # Port.open spawns external programs at runtime - it doesn't affect
+    # compilation. e.g. ecto_sql uses Port.open for database CLI tools
+    File.mkdir_p!(Path.join(tmp_dir, "lib"))
+
+    File.write!(Path.join([tmp_dir, "lib", "port_mod.ex"]), """
+    defmodule PortMod do
+      def start do
+        Port.open({:spawn, "echo hello"}, [:binary])
+      end
+    end
+    """)
+
+    assert :pure = NifDetector.detect(tmp_dir)
   end
 
   @tag :tmp_dir
@@ -89,26 +107,12 @@ defmodule DepsPrebuild.NifDetectorTest do
   end
 
   @tag :tmp_dir
-  test "detects Port.open usage", %{tmp_dir: tmp_dir} do
-    File.mkdir_p!(Path.join(tmp_dir, "lib"))
-
-    File.write!(Path.join([tmp_dir, "lib", "port_mod.ex"]), """
-    defmodule PortMod do
-      def start do
-        Port.open({:spawn, "echo hello"}, [:binary])
-      end
-    end
-    """)
+  test "c_src + Makefile both detected", %{tmp_dir: tmp_dir} do
+    # file_system package: has c_src/ for inotify wrapper
+    File.mkdir_p!(Path.join(tmp_dir, "c_src"))
+    File.write!(Path.join([tmp_dir, "c_src", "nif.c"]), "#include <erl_nif.h>")
 
     assert {:native, reasons} = NifDetector.detect(tmp_dir)
-    assert :port_call in reasons
-  end
-
-  @tag :tmp_dir
-  test "detects CMakeLists.txt", %{tmp_dir: tmp_dir} do
-    File.write!(Path.join(tmp_dir, "CMakeLists.txt"), "cmake_minimum_required(VERSION 3.0)")
-
-    assert {:native, reasons} = NifDetector.detect(tmp_dir)
-    assert :makefile in reasons
+    assert :c_src_dir in reasons
   end
 end

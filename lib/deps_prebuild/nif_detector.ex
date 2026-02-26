@@ -1,17 +1,22 @@
 defmodule DepsPrebuild.NifDetector do
   @moduledoc """
-  Detects whether a package contains NIFs or Ports.
+  Detects whether a package contains NIFs that require native compilation.
 
-  Packages without NIFs/Ports produce pure BEAM bytecode that is
-  portable across all architectures. These only need to be built
-  once per Elixir/OTP version and mix_env, not per-architecture.
+  Packages without NIFs produce pure BEAM bytecode that is portable across
+  all architectures. These only need to be built once per Elixir/OTP version
+  and mix_env, not per-architecture.
 
-  Packages with NIFs compile native code and need platform-specific
+  Packages with NIFs compile native C/Rust code and need platform-specific
   builds for each architecture/os/libc combination.
+
+  Note: Port.open/open_port usage is NOT a native compilation indicator.
+  Ports spawn external programs at runtime but don't affect compilation.
+  Similarly, a Makefile alone isn't an indicator - many Erlang packages
+  use erlang.mk which has a Makefile for compiling .erl files, not C code.
   """
 
   @doc """
-  Checks a package's unpacked contents directory for NIF/Port indicators.
+  Checks a package's unpacked contents directory for NIF indicators.
 
   Returns:
     - `:pure` - no native code detected, BEAM files are portable
@@ -21,10 +26,8 @@ defmodule DepsPrebuild.NifDetector do
     reasons =
       []
       |> check_c_src(contents_dir)
-      |> check_makefile(contents_dir)
       |> check_nif_calls(contents_dir)
-      |> check_port_calls(contents_dir)
-      |> check_port_compiler(contents_dir)
+      |> check_native_compiler(contents_dir)
 
     case reasons do
       [] -> :pure
@@ -32,24 +35,10 @@ defmodule DepsPrebuild.NifDetector do
     end
   end
 
-  # c_src/ directory is the conventional location for NIF C code
+  # c_src/ directory is the conventional location for NIF C/C++ code
   defp check_c_src(reasons, contents_dir) do
     if File.dir?(Path.join(contents_dir, "c_src")) do
       [:c_src_dir | reasons]
-    else
-      reasons
-    end
-  end
-
-  # Makefile or Makefile.win indicate native compilation
-  defp check_makefile(reasons, contents_dir) do
-    has_makefile =
-      Enum.any?(["Makefile", "Makefile.win", "CMakeLists.txt"], fn name ->
-        File.exists?(Path.join(contents_dir, name))
-      end)
-
-    if has_makefile do
-      [:makefile | reasons]
     else
       reasons
     end
@@ -59,8 +48,7 @@ defmodule DepsPrebuild.NifDetector do
   defp check_nif_calls(reasons, contents_dir) do
     nif_patterns = [
       ~r/:erlang\.load_nif/,
-      ~r/erlang:load_nif/,
-      ~r/erl_nif\.h/
+      ~r/erlang:load_nif/
     ]
 
     source_files = find_source_files(contents_dir)
@@ -78,30 +66,8 @@ defmodule DepsPrebuild.NifDetector do
     end
   end
 
-  # Scan for Port usage
-  defp check_port_calls(reasons, contents_dir) do
-    port_patterns = [
-      ~r/Port\.open/,
-      ~r/open_port\(/
-    ]
-
-    source_files = find_source_files(contents_dir)
-
-    has_port =
-      Enum.any?(source_files, fn file ->
-        content = File.read!(file)
-        Enum.any?(port_patterns, &Regex.match?(&1, content))
-      end)
-
-    if has_port do
-      [:port_call | reasons]
-    else
-      reasons
-    end
-  end
-
-  # Check mix.exs for elixir_make or other native compilation plugins
-  defp check_port_compiler(reasons, contents_dir) do
+  # Check mix.exs for native compilation tools
+  defp check_native_compiler(reasons, contents_dir) do
     mix_exs = Path.join(contents_dir, "mix.exs")
 
     if File.exists?(mix_exs) do
@@ -112,7 +78,6 @@ defmodule DepsPrebuild.NifDetector do
         ~r/:rustler/,
         ~r/:zigler/,
         ~r/:cmake/,
-        ~r/compilers:.*:make/,
         ~r/compilers:.*:elixir_make/
       ]
 
