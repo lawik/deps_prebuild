@@ -8,9 +8,6 @@
 - [x] Fix `CROSSCOMPILE` typo (`{$GCC_PREFIX}` -> `${GCC_PREFIX}`)
 - [x] Remove `ABI` arg duplication (now uses `LIBC` consistently)
 - [x] Remove dead commented-out code and placeholder env vars
-- [ ] Verify toolchain env vars actually get sourced during `mix compile`
-  (the /etc/profile.d/ approach may not work in non-login Docker RUN shells)
-- [ ] Get one package (e.g. `jason`) cross-compiling for aarch64 successfully
 
 ### Code Cleanup
 - [x] Remove all `dbg()` calls throughout the codebase
@@ -41,30 +38,34 @@
 - [x] Pure builds skip ARCH/GCC_VERSION/LIBC docker args
 - [x] Extracted duplicate docker flow into `do_docker_build/2`
 
+### End-to-End Build (pure packages)
+- [x] Fix Docker base image: `ubuntu-jammy` tags don't exist, switched to `debian-bookworm`
+- [x] Made base image OS configurable via `BASE_IMAGE_OS` build arg
+- [x] Fix `pack/2`: relative paths, no directory entries, no duplicates
+- [x] Add `docker_rmi/1` to clean up images after artifact extraction
+- [x] Stop leaking `GITHUB_API_TOKEN` in docker build log output
+- [x] Verified: `jason 1.4.1` builds end-to-end as pure BEAM package
+- [x] Produces clean `.tar.gz` with 29 relative-path `.beam` files
+
 ---
 
 ## Up Next
 
-### 1. End-to-End Build Verification
+### 1. Cross-Compilation Verification (native packages)
 
-The build pipeline exists but hasn't been proven end-to-end. There are
-likely issues that will surface when actually running Docker builds.
+The pure build path works. The cross-compilation path still needs testing.
 
-- [ ] Test `mix deps.build_lock` against a simple project
 - [ ] Verify the `/etc/profile.d/toolchain.sh` approach works in Docker RUN
-  (may need to `source` it explicitly or use a different env setup)
-- [ ] Verify the artifact can be unpacked and used in a consuming project
-- [ ] Test a native package build (e.g. `jason_native` or `comeonin`)
-- [ ] Test a pure package build (e.g. `jason`)
+  (non-login shells don't source profile.d - may need explicit `source` or
+  just set env vars directly with Docker ENV using separate RUN blocks)
+- [ ] Test building a native package (e.g. one with NIFs) on x86_64
+- [ ] Test cross-compiling for aarch64 from x86_64
 
-### 2. Unused Code Cleanup
-
-Remaining compiler warnings from pre-existing code:
+### 2. Remaining Compiler Warnings
 
 - [ ] `@oses` module attribute unused in `deps_prebuild.ex` (superseded by Platform)
 - [ ] `@dh_page_size` module attribute unused
 - [ ] `to_app_names/1` unused in `get_build.ex`
-- [ ] `major_minor/1` and `major/1` unused in `build_lock.ex` (now in Platform)
 - [ ] Decide: keep `get_build.ex` or rewrite from scratch (it's mostly copied
   Mix.Dep.Fetcher internals that don't actually fetch pre-builds)
 
@@ -106,7 +107,6 @@ eventually be extracted into its own Hex package.
 - [ ] Integrate with `mix deps.get` flow or run as a post-step
 - [ ] Eventually: extract to its own repo/hex package (e.g. `prebuilt` or `hex_prebuilt`)
 - [ ] Decide: rewrite `get_build.ex` from scratch vs adapting current code
-  (current code is copied Mix internals and doesn't actually fetch pre-builds)
 
 ### 6. CI/CD Automation
 
@@ -138,8 +138,6 @@ code generation, or other unusual setups.
 
 - [ ] Cache the toolchain download layer (it's large and slow)
 - [ ] Consider multi-stage builds to reduce final image size
-- [ ] Investigate if the profile.d approach works or if we need
-  explicit `source /etc/profile.d/toolchain.sh &&` in RUN commands
 - [ ] Test builds with Alpine base image (smaller, musl-based)
 
 ### 10. Documentation
