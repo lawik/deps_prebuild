@@ -29,10 +29,10 @@ defmodule DepsPrebuild do
 
   def docker_hub_find_tag(prefix) do
     "https://hub.docker.com/v2/namespaces/#{@dh_namespace}/repositories/#{@dh_repo}/tags?page=1&page_size=100"
-    |> docker_hub_find()
+    |> docker_hub_find(prefix)
   end
 
-  defp docker_hub_find(url) do
+  defp docker_hub_find(url, prefix) do
     with {:ok, %{body: %{"results" => results}} = meta} <- Req.get(url) do
       find =
         Enum.find(results, fn %{"name" => name} ->
@@ -45,7 +45,7 @@ defmodule DepsPrebuild do
 
         nil ->
           if meta["next"] do
-            docker_hub_find(meta["next"])
+            docker_hub_find(meta["next"], prefix)
           else
             {:error, :no_match}
           end
@@ -74,7 +74,6 @@ defmodule DepsPrebuild do
     File.mkdir_p!(new_dir)
 
     :erl_tar.extract(archive_path, [{:cwd, new_dir}, :compressed])
-    |> dbg()
   end
 
   def search(search, page, sort \\ "recent_downloads") do
@@ -128,9 +127,9 @@ defmodule DepsPrebuild do
       build = Build.set_unpacked_dir(build, unpack_path)
       File.mkdir_p!(unpack_path)
 
-      with {:ok, build} <- download_to(build) |> dbg(),
-           {:ok, build} <- unpack_and_verify(build) |> dbg(),
-           {:ok, build} <- check_package_type(build) |> dbg(),
+      with {:ok, build} <- download_to(build),
+           {:ok, build} <- unpack_and_verify(build),
+           {:ok, build} <- check_package_type(build),
            {:ok, build} <- build_package(build),
            {:ok, build} <- extract_build(build),
            {:ok, build} <- package_build(build) do
@@ -202,7 +201,7 @@ defmodule DepsPrebuild do
           {:ok, Build.set_package_type(b, :erlang)}
 
         true ->
-          dbg(files)
+          Logger.warning("Unrecognized package layout, files: #{inspect(files)}")
           {:error, :no_project_file}
       end
     end
@@ -242,7 +241,6 @@ defmodule DepsPrebuild do
       base
       |> Path.join("/**/#{b.package_name}")
       |> Path.wildcard()
-      |> dbg()
 
     case entries do
       [artifact_dir] ->
@@ -324,7 +322,7 @@ defmodule DepsPrebuild do
 
       {out, status} ->
         Logger.error("Failed during docker cp with status #{status}: #{out}")
-        {:error, {:docker_create_fail, status}}
+        {:error, {:docker_cp_failed, status}}
     end
   end
 
@@ -335,7 +333,7 @@ defmodule DepsPrebuild do
 
       {out, status} ->
         Logger.error("Failed during docker rm with status #{status}: #{out}")
-        {:error, {:docker_create_fail, status}}
+        {:error, {:docker_rm_failed, status}}
     end
   end
 
@@ -393,49 +391,4 @@ defmodule DepsPrebuild do
     |> Path.wildcard()
     |> Enum.find(&String.contains?(&1, "rebar3"))
   end
-
-  #   search(Config, Query, SearchParams) when
-  #     is_map(Config) and is_binary(Query) and is_list(SearchParams)
-  # ->
-  #     QueryString = hex_api:encode_query_string([{search, Query} | SearchParams]),
-  #     Path = hex_api:join_path_segments(hex_api:build_repository_path(Config, ["packages"])),
-  #     PathQuery = <<Path/binary, "?", QueryString/binary>>,
-  #     hex_api:get(Config, PathQuery).
-
-  # def tar(dir) do
-  #   dir
-  #   |> Path.join("**")
-  #   |> Path.wildcard()
-  #   |> then(fn filenames ->
-  #     :erl_tar.create("")
-  # end
-
-  # def untar(filepath, new_dir) do
-
-  # end
-
-  # def compress_stream(stream) do
-  #   # zst =
-  #   #   ExZstd.cstream_new()
-  #   #   |> ExZstd.cstream_init()
-  #   stream
-  #   |> StreamGzip.gzip()
-  #   #|> Stream.map(fn chunk ->
-  #     # {:ok, compressed} = ExZstd.stream_compress(zst, chunk)
-  #   #  compressed
-  #   #end)
-  # end
-
-  # def decompress_stream(stream) do
-  #   # zst =
-  #   #   ExZstd.dstream_new()
-  #   #   |> ExZstd.dstream_init()
-
-  #   stream
-  #   #|> Stream.map(fn chunk ->
-  #     # {:ok, decompressed} = ExZstd.stream_decompress(zst, chunk)
-  #   #  decompressed
-  #   #end)
-  #   |> StreamGzip.gunzip()
-  # end
 end

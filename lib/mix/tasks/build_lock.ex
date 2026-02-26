@@ -45,7 +45,7 @@ defmodule Mix.Tasks.Deps.BuildLock do
           pkg_path = Path.join(dir, "#{name}.tar.gz")
           build = Build.set_hex_package_path(build, pkg_path)
 
-          with {:ok, build} <- DepsPrebuild.download_to(build) |> dbg() do
+          with {:ok, build} <- DepsPrebuild.download_to(build) do
             Enum.map([:dev, :prod, :test], fn env ->
               env = to_string(env)
               build = Build.set_mix_env(build, env)
@@ -53,11 +53,11 @@ defmodule Mix.Tasks.Deps.BuildLock do
               File.mkdir_p!(unpack_path)
               build = Build.set_unpacked_dir(build, unpack_path)
 
-              with {:ok, build} <- DepsPrebuild.unpack_and_verify(build) |> dbg(),
-                   {:ok, build} <- DepsPrebuild.check_package_type(build) |> dbg(),
-                   {:ok, build} <- DepsPrebuild.build_package(build) |> dbg(),
-                   {:ok, build} <- DepsPrebuild.extract_build(build) |> dbg(),
-                   {:ok, build} <- DepsPrebuild.package_build(build) |> dbg() do
+              with {:ok, build} <- DepsPrebuild.unpack_and_verify(build),
+                   {:ok, build} <- DepsPrebuild.check_package_type(build),
+                   {:ok, build} <- DepsPrebuild.build_package(build),
+                   {:ok, build} <- DepsPrebuild.extract_build(build),
+                   {:ok, build} <- DepsPrebuild.package_build(build) do
                 IO.puts("Finished building #{name} @ #{version} for #{env}")
                 IO.puts("Build at: #{build.built_dir}")
               end

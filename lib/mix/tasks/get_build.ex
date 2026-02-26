@@ -38,7 +38,6 @@ defmodule Mix.Tasks.Deps.GetBuilt do
     old_lock = %{}
     # lock = %{}
     lock = Mix.Dep.Lock.read()
-    dbg(lock)
     # Lifted from Mix.Dep.Fetcher
     result = Mix.Dep.Converger.converge(acc, lock, fetch_opts, &do_converge/3)
     {apps, _deps} = do_finalize(result, old_lock, opts)
@@ -51,7 +50,6 @@ defmodule Mix.Tasks.Deps.GetBuilt do
   end
 
   def do_converge(dep, acc, lock) do
-    dbg(dep)
     %Mix.Dep{app: app, scm: scm, opts: opts} = dep = check_lock(dep)
 
     cond do
