@@ -2,14 +2,8 @@ defmodule DepsPrebuild do
   alias DepsPrebuild.Build
   require Logger
 
-  @gcc_version "v13.2.0"
+  @gcc_version "v14.2.0"
 
-  # No musl is not a problem for us. We are using the nerves cross-compilation tool-chains
-  @oses [
-    # :windows,
-    # :macos,
-    :linux
-  ]
   @architectures [:x86_64, :armv5, :armv6, :armv7, :aarch64]
   @arch_and_os [
     windows: [:x86_64],
@@ -25,7 +19,6 @@ defmodule DepsPrebuild do
 
   @dh_namespace "hexpm"
   @dh_repo "elixir"
-  @dh_page_size 100
 
   def docker_hub_find_tag(prefix) do
     "https://hub.docker.com/v2/namespaces/#{@dh_namespace}/repositories/#{@dh_repo}/tags?page=1&page_size=100"

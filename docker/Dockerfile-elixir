@@ -3,7 +3,7 @@ ARG OTP_VERSION
 ARG BASE_IMAGE_OS="debian-bookworm-20260223"
 ARG ARCH
 ARG GCC_VERSION
-ARG LIBC
+ARG ABI
 ARG MIX_ENV
 ARG GITHUB_API_TOKEN
 
@@ -11,7 +11,7 @@ FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-${BASE_IMAGE_OS}
 
 ARG ARCH
 ARG GCC_VERSION
-ARG LIBC
+ARG ABI
 ARG MIX_ENV
 ARG GITHUB_API_TOKEN
 
@@ -23,32 +23,26 @@ RUN git clone https://github.com/lawik/asdf-plugin-nerves-toolchain.git /apnt
 WORKDIR /apnt
 RUN mkdir /apnt/download
 RUN export ASDF_INSTALL_TYPE="version" && \
-    export ASDF_INSTALL_VERSION="${GCC_VERSION}-${ARCH}-nerves-linux-${LIBC}" && \
+    export ASDF_INSTALL_VERSION="${GCC_VERSION}-${ARCH}-nerves-linux-${ABI}" && \
     export ASDF_INSTALL_PATH="/apnt/toolchain/" && \
     export ASDF_DOWNLOAD_PATH="/apnt/download" && \
     ./bin/download
 
-# Set up cross-compilation environment
-# Docker ENV doesn't cascade references within a single block,
-# so we use a shell script to set up the toolchain paths.
-RUN TC_BASE="/apnt/download" && \
-    GCC_PREFIX="${ARCH}-nerves-linux-${LIBC}-" && \
-    echo "export PATH=\"\$PATH:${TC_BASE}/bin\"" >> /etc/profile.d/toolchain.sh && \
-    echo "export CC=\"${GCC_PREFIX}gcc\"" >> /etc/profile.d/toolchain.sh && \
-    echo "export CXX=\"${GCC_PREFIX}g++\"" >> /etc/profile.d/toolchain.sh && \
-    echo "export LD=\"${GCC_PREFIX}ld\"" >> /etc/profile.d/toolchain.sh && \
-    echo "export AR=\"${GCC_PREFIX}ar\"" >> /etc/profile.d/toolchain.sh && \
-    echo "export AS=\"${GCC_PREFIX}as\"" >> /etc/profile.d/toolchain.sh && \
-    echo "export NM=\"${GCC_PREFIX}nm\"" >> /etc/profile.d/toolchain.sh && \
-    echo "export RANLIB=\"${GCC_PREFIX}ranlib\"" >> /etc/profile.d/toolchain.sh && \
-    echo "export OBJCOPY=\"${GCC_PREFIX}objcopy\"" >> /etc/profile.d/toolchain.sh && \
-    echo "export STRIP=\"${GCC_PREFIX}strip\"" >> /etc/profile.d/toolchain.sh && \
-    echo "export LDFLAGS=\"-L${TC_BASE}/lib\"" >> /etc/profile.d/toolchain.sh && \
-    echo "export CFLAGS=\"-I${TC_BASE}/include\"" >> /etc/profile.d/toolchain.sh && \
-    echo "export CPPFLAGS=\"-I${TC_BASE}/include\"" >> /etc/profile.d/toolchain.sh && \
-    echo "export CROSSCOMPILE=\"${GCC_PREFIX}\"" >> /etc/profile.d/toolchain.sh
-
-ENV PATH="$PATH:/apnt/download/bin"
+# Set up cross-compilation environment via Docker ENV
+ENV PATH="$PATH:/apnt/download/bin" \
+    CC="${ARCH}-nerves-linux-${ABI}-gcc" \
+    CXX="${ARCH}-nerves-linux-${ABI}-g++" \
+    LD="${ARCH}-nerves-linux-${ABI}-ld" \
+    AR="${ARCH}-nerves-linux-${ABI}-ar" \
+    AS="${ARCH}-nerves-linux-${ABI}-as" \
+    NM="${ARCH}-nerves-linux-${ABI}-nm" \
+    RANLIB="${ARCH}-nerves-linux-${ABI}-ranlib" \
+    OBJCOPY="${ARCH}-nerves-linux-${ABI}-objcopy" \
+    STRIP="${ARCH}-nerves-linux-${ABI}-strip" \
+    CROSSCOMPILE="${ARCH}-nerves-linux-${ABI}-" \
+    LDFLAGS="-L/apnt/download/lib" \
+    CFLAGS="-I/apnt/download/include" \
+    CPPFLAGS="-I/apnt/download/include"
 
 COPY . /build
 WORKDIR /build

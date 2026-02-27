@@ -31,7 +31,7 @@ defmodule DepsPrebuild.Build do
     struct!(B, attrs)
   end
 
-  def for_current_platform(gcc_version \\ "v13.2.0") do
+  def for_current_platform(gcc_version \\ "v14.2.0") do
     alias DepsPrebuild.Platform
 
     %B{
@@ -138,10 +138,21 @@ defmodule DepsPrebuild.Build do
       "--build-arg",
       "GCC_VERSION=#{b.gcc_version}",
       "--build-arg",
-      "LIBC=#{b.libc}",
+      "ABI=#{toolchain_abi(b)}",
       "--build-arg",
       "MIX_ENV=#{b.mix_env}"
     ]
+  end
+
+  def toolchain_abi(%B{arch: arch, libc: libc}) do
+    case {arch, libc} do
+      {:armv7, :gnu} -> "gnueabihf"
+      {:armv6, :gnu} -> "gnueabihf"
+      {:armv7, :musl} -> "musleabihf"
+      {:armv5, :musl} -> "musleabi"
+      {_, :musl} -> "musl"
+      {_, :gnu} -> "gnu"
+    end
   end
 
   def tag(%B{} = b) do
