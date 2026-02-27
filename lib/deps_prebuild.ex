@@ -91,8 +91,30 @@ defmodule DepsPrebuild do
   end
 
   def p1 do
-    {:ok, results} = search("", 1)
-    dir = "/tmp/p1"
+    run_build(1..1, "/tmp/p1")
+  end
+
+  def p200 do
+    run_build(1..4, "/tmp/p200")
+  end
+
+  def run_build(page_range, dir) do
+    results =
+      page_range
+      |> Enum.flat_map(fn page ->
+        case search("", page) do
+          {:ok, packages} -> packages
+          {:error, reason} ->
+            Logger.error("Failed to fetch page #{page}: #{inspect(reason)}")
+            []
+        end
+      end)
+
+    # Deduplicate by package name (in case of overlap between pages)
+    results =
+      results
+      |> Enum.uniq_by(fn %{"name" => name} -> name end)
+
     File.rm_rf(dir)
     File.mkdir_p!(dir)
 
@@ -106,45 +128,114 @@ defmodule DepsPrebuild do
       |> Build.set_libc(:gnu)
       |> Build.set_mix_env(:prod)
 
-    results
-    # |> Enum.take(5)
-    |> Enum.with_index()
-    |> Enum.map(fn {package, index} ->
-      %{"name" => name, "latest_stable_version" => version} = package
+    total = length(results)
+    IO.puts("Building #{total} packages...")
 
-      build =
-        build
-        |> Build.set_package_name(name)
-        |> Build.set_package_version(version)
+    {outcomes, _} =
+      results
+      |> Enum.with_index()
+      |> Enum.reduce({[], build}, fn {package, index}, {acc, build} ->
+        %{"name" => name, "latest_stable_version" => version} = package
 
-      IO.puts("Trying to download and build #{name} @ #{version}...")
-      pkg_path = Path.join(dir, "#{name}.tar.gz")
-      build = Build.set_hex_package_path(build, pkg_path)
-      unpack_path = Path.join(dir, name)
-      build = Build.set_unpacked_dir(build, unpack_path)
-      File.mkdir_p!(unpack_path)
+        build =
+          build
+          |> Build.set_package_name(name)
+          |> Build.set_package_version(version)
 
-      with {:ok, build} <- download_to(build),
-           {:ok, build} <- unpack_and_verify(build),
-           {:ok, build} <- check_package_type(build),
-           build = detect_native(build),
-           {:ok, build} <- build_package(build),
-           {:ok, build} <- extract_build(build),
-           {:ok, build} <- package_build(build) do
-        native_label = if build.native, do: " (native: #{inspect(build.native_reasons)})", else: " (pure)"
-        IO.puts("Finished building #{name} @ #{version}#{native_label}")
-        IO.puts("Build at: #{build.built_dir}")
-        IO.puts("Done ##{index + 1}")
-        :ok
-      else
-        {:skip, reason} ->
-          IO.puts("Skipping package #{name} @ #{version}, unusual setup: #{reason}")
+        IO.puts("[#{index + 1}/#{total}] Trying to download and build #{name} @ #{version}...")
+        pkg_path = Path.join(dir, "#{name}.tar.gz")
+        build = Build.set_hex_package_path(build, pkg_path)
+        unpack_path = Path.join(dir, name)
+        build = Build.set_unpacked_dir(build, unpack_path)
+        File.mkdir_p!(unpack_path)
 
-        e ->
-          Logger.error("Build failed for #{name} @ #{version}: #{inspect(e)}")
-          {:error, e}
-      end
+        result =
+          with {:ok, build} <- download_to(build),
+               {:ok, build} <- unpack_and_verify(build),
+               {:ok, build} <- check_package_type(build),
+               build = detect_native(build),
+               {:ok, build} <- build_package(build),
+               {:ok, build} <- extract_build(build),
+               {:ok, build} <- package_build(build) do
+            type = if build.native, do: "native", else: "pure"
+            native_label = if build.native, do: " (native: #{inspect(build.native_reasons)})", else: " (pure)"
+            IO.puts("[#{index + 1}/#{total}] OK #{name} @ #{version}#{native_label}")
+            {:ok, %{name: name, version: version, type: type, native_reasons: build.native_reasons}}
+          else
+            {:skip, reason} ->
+              IO.puts("[#{index + 1}/#{total}] SKIP #{name} @ #{version}: #{reason}")
+              {:skip, %{name: name, version: version, reason: reason}}
+
+            {:error, reason} ->
+              Logger.error("[#{index + 1}/#{total}] FAIL #{name} @ #{version}: #{inspect(reason)}")
+              {:error, %{name: name, version: version, error: inspect(reason)}}
+
+            e ->
+              Logger.error("[#{index + 1}/#{total}] FAIL #{name} @ #{version}: #{inspect(e)}")
+              {:error, %{name: name, version: version, error: inspect(e)}}
+          end
+
+        new_acc = acc ++ [result]
+        write_progress(new_acc, total)
+        {new_acc, build}
+      end)
+
+    outcomes
+  end
+
+  defp write_progress([], _total), do: :ok
+  defp write_progress(outcomes, total) do
+    oks = Enum.filter(outcomes, &match?({:ok, _}, &1))
+    skips = Enum.filter(outcomes, &match?({:skip, _}, &1))
+    fails = Enum.filter(outcomes, &match?({:error, _}, &1))
+
+    ok_rows = oks |> Enum.with_index(1) |> Enum.map_join("\n", fn {{:ok, r}, i} ->
+      "| #{i} | #{r.name} | #{r.version} | #{r.type} |"
     end)
+
+    skip_rows = skips |> Enum.map_join("\n", fn {:skip, r} ->
+      "| #{r.name} | #{r.version} | #{r.reason} |"
+    end)
+
+    fail_rows = fails |> Enum.map_join("\n", fn {:error, r} ->
+      "| #{r.name} | #{r.version} | #{r.error} |"
+    end)
+
+    report = """
+    # Build Report - Top #{total} Hex Packages
+
+    Built with Elixir 1.17.1 / OTP 26.2.5.1
+    Platform: linux-x86_64-gnu
+    Date: #{Date.utc_today()}
+    Progress: #{length(outcomes)}/#{total}
+
+    ## Summary
+
+    - OK: #{length(oks)}
+    - Skipped: #{length(skips)}
+    - Failed: #{length(fails)}
+
+    ## Successful Builds
+
+    | # | Package | Version | Type |
+    |---|---------|---------|------|
+    #{ok_rows}
+
+    ## Skipped
+
+    | Package | Version | Reason |
+    |---------|---------|--------|
+    #{skip_rows}
+
+    ## Failed
+
+    | Package | Version | Error |
+    |---------|---------|-------|
+    #{fail_rows}
+    """
+    |> String.trim_leading()
+
+    File.write!("PROGRESS-200.md", report)
   end
 
   def download(package, version) do
